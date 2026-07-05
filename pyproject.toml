@@ -32,6 +32,7 @@ translator = "translator.app:main"
 translator-cli = "translator.cli:main"
 translator-setup = "translator.setup_cli:main"
 translator-bench = "translator.bench:main"
+translator-startup = "translator.startup_cli:main"
 
 [[tool.uv.index]]
 name = "pytorch-cpu"

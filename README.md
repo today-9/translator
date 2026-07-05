@@ -66,10 +66,18 @@ uv run translator-bench --engines fugumt plamo
 
 ## スタートアップ登録(任意)
 
-`shell:startup` フォルダに以下のショートカットを作成:
-
+```powershell
+uv run translator-startup            # ログイン時の自動起動を登録
+uv run translator-startup uninstall  # 解除
+uv run translator-startup status     # 確認
 ```
-uv --directory C:\Users\kami1\development\translator run translator
+
+pythonw.exe(コンソールなし)で起動するショートカットを `shell:startup` に作る。
+ターミナルから `uv run translator` で起動した場合と違い、ターミナルを閉じても
+アプリは終了しない。手動でターミナル非依存に起動したい場合:
+
+```powershell
+Start-Process .venv\Scripts\pythonw.exe -ArgumentList "-m","translator.app"
 ```
 
 ## 設定
