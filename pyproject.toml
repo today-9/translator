@@ -1,0 +1,46 @@
+[project]
+name = "translator"
+version = "0.1.0"
+description = "Offline EN->JA translation tray tool (dictionary / FuguMT / PLaMo / Qwen-NPU)"
+readme = "README.md"
+authors = [
+    { name = "today", email = "toda.yuto2023@gmail.com" }
+]
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "keyboard>=0.13.5",
+    "mouse>=0.7.1",
+    "pystray>=0.19.5",
+    "pillow>=10.0",
+    "pywin32>=306",
+    "ctranslate2>=4.0",
+    "sentencepiece>=0.2.0",
+    "huggingface_hub>=0.23",
+    "requests>=2.31",
+    "openvino-genai>=2025.3",
+]
+
+[project.optional-dependencies]
+convert = [
+    "transformers>=4.40",
+    "torch>=2.3",
+    "optimum-intel[openvino]>=1.20",
+]
+
+[project.scripts]
+translator = "translator.app:main"
+translator-cli = "translator.cli:main"
+translator-setup = "translator.setup_cli:main"
+translator-bench = "translator.bench:main"
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cpu" }
+
+[build-system]
+requires = ["uv_build>=0.10.10,<0.11.0"]
+build-backend = "uv_build"

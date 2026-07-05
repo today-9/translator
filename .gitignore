@@ -1,0 +1,20 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# モデル・辞書(数GB。translator-setup で再取得できる)
+data/
+
+# 個人設定(初回起動時に自動生成される)
+config.toml
+
+# ローカル環境固有
+.claude/
+*.log
