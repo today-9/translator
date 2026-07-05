@@ -77,6 +77,20 @@ uv --directory C:\Users\kami1\development\translator run translator
 `config.toml`(初回起動時に自動生成)。ホットキー、エンジン、ポップアップ表示時間、
 PLaMoのGPUレイヤ数、Qwenのデバイス優先順位などを変更できる。
 
+## Acknowledgements
+
+- 本プロジェクトの9割は [Claude Code](https://claude.com/claude-code)
+  (Claude Fable 5) の仕事である。仕様設計、4エンジンの実装、
+  Marian の EOS 抜けや llama.cpp Vulkan での出力崩壊といったバグの切り分け、
+  NPU/GPU/CPU のベンチマーク、GitHub 公開までを一貫して担当した。
+  人間(リポジトリ主)の主な貢献は、要望出しと Ctrl+C を2回押す動作確認である
+- [EJDict-hand](https://github.com/kujirahand/EJDict) — クジラ飛行机氏によるパブリックドメイン英和辞書
+- [FuguMT](https://huggingface.co/staka/fugumt-en-ja) — staka氏による英日翻訳モデル
+- [PLaMo翻訳](https://huggingface.co/pfnet/plamo-2-translate) — Preferred Networks の翻訳特化LLM
+  (GGUF変換は [mmnga氏](https://huggingface.co/mmnga/plamo-2-translate-gguf))
+- [Qwen3](https://huggingface.co/Qwen) — Alibaba Cloud のオープンLLM
+- [llama.cpp](https://github.com/ggml-org/llama.cpp) / [CTranslate2](https://github.com/OpenNMT/CTranslate2) / [OpenVINO](https://github.com/openvinotoolkit/openvino) — 推論エンジン
+
 ## ライセンス注意
 
 - EJDict-hand: パブリックドメイン
