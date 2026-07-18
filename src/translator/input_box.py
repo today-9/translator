@@ -78,6 +78,10 @@ class InputBox:
         win.geometry(f"+{x}+{y}")
 
         entry.bind("<Return>", self._submit)
+        entry.bind("<KP_Enter>", self._submit)
+        # Esc はフォーカスを持つ Entry 側にも直接バインドする
+        # (Toplevel 側のバインドだけだと届かない環境がある)
+        entry.bind("<Escape>", self._close)
         win.bind("<Escape>", self._close)
         win.protocol("WM_DELETE_WINDOW", self._close)
         win.lift()
