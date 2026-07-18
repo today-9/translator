@@ -169,7 +169,19 @@ class App:
 
 
 def main() -> None:
-    App().run()
+    # 多重起動ガード(2つ動くとホットキーが二重発火する)
+    import win32api
+    import win32event
+    import winerror
+
+    mutex = win32event.CreateMutex(None, False, "Global\\translator-tray-app")
+    if win32api.GetLastError() == winerror.ERROR_ALREADY_EXISTS:
+        print("既に起動しています(トレイアイコンを確認してください)")
+        return
+    try:
+        App().run()
+    finally:
+        win32api.CloseHandle(mutex)
 
 
 if __name__ == "__main__":
