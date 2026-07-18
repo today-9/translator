@@ -23,7 +23,8 @@ input_combo = "ctrl+alt+t"
 sentence = "fugumt"
 
 [popup]
-timeout_ms = 15000
+# 自動で消えるまでの時間(ミリ秒)。Esc・クリックでいつでも消せるので長めの保険
+timeout_ms = 300000
 font_family = "Yu Gothic UI"
 font_size = 11
 max_width = 480
@@ -51,7 +52,7 @@ class Config:
     double_press_ms: int = 500
     input_combo: str = "ctrl+alt+t"
     sentence_engine: str = "fugumt"
-    popup_timeout_ms: int = 15000
+    popup_timeout_ms: int = 300000
     font_family: str = "Yu Gothic UI"
     font_size: int = 11
     popup_max_width: int = 480
