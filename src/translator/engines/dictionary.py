@@ -14,7 +14,8 @@ from .base import Engine, EngineNotReady
 USER_DICT_TEMPLATE = """\
 # translator ユーザー辞書
 # 書式: 見出し<TAB>意味   (タブ区切り、1行1見出し。# で始まる行は無視)
-# EJDict より優先される。保存すれば即反映(アプリ再起動不要)。
+# ここの訳が先頭に表示され、EJDict の訳も続けて併記される。
+# 保存すれば即反映(アプリ再起動不要)。
 pc\t〈C〉パソコン,パーソナルコンピュータ
 """
 
@@ -54,18 +55,18 @@ class DictionaryEngine(Engine):
         return self._conn
 
     def lookup(self, word: str) -> str | None:
-        """単語を引く(ユーザー辞書優先)。見出しに無ければ語形変化を剥がして再試行。"""
+        """単語を引く。ユーザー辞書の訳を先頭に、EJDict の訳も併記する。
+        見出しに無ければ語形変化を剥がして再試行。"""
         conn = self._connect()
         for candidate in self._candidates(word.lower()):
-            prefix = "" if candidate == word.lower() else f"({candidate}) "
-            user = self._user_lookup(candidate)
-            if user is not None:
-                return prefix + "・" + user.replace(" / ", "\n・")
             row = conn.execute(
                 "SELECT meaning FROM entries WHERE word = ?", (candidate,)
             ).fetchone()
-            if row:
-                return prefix + "・" + row[0].replace(" / ", "\n・")
+            meanings = [m for m in (self._user_lookup(candidate), row[0] if row else None)
+                        if m is not None]
+            if meanings:
+                prefix = "" if candidate == word.lower() else f"({candidate}) "
+                return prefix + "・" + " / ".join(meanings).replace(" / ", "\n・")
         return None
 
     @staticmethod
