@@ -7,6 +7,7 @@ import threading
 import tkinter as tk
 from tkinter import font as tkfont
 
+import keyboard
 import mouse
 import win32api
 
@@ -39,6 +40,7 @@ class PopupManager:
         self._win: tk.Toplevel | None = None
         self._timeout_id: str | None = None
         self._mouse_hook = None
+        self._esc_hook = None
         self._close_requested = threading.Event()
         self._poll()
 
@@ -67,6 +69,12 @@ class PopupManager:
             except (ValueError, OSError):
                 pass
             self._mouse_hook = None
+        if self._esc_hook is not None:
+            try:
+                keyboard.remove_hotkey(self._esc_hook)
+            except (KeyError, ValueError):
+                pass
+            self._esc_hook = None
 
     def _close(self, _event=None) -> None:
         self._unhook_mouse()
@@ -116,8 +124,14 @@ class PopupManager:
 
         win.bind("<Escape>", self._close)
         win.bind("<Button-1>", self._close)
-        # 画面のどこをクリックしても閉じる(タイムアウトは保険)
+        # 画面のどこをクリックしても・Esc でも閉じる(タイムアウトは保険)。
+        # ポップアップはフォーカスを奪わない設計のため、表示中だけ
+        # グローバルフックで受ける。suppress しないので前面アプリの
+        # Esc 動作はそのまま
         self._mouse_hook = mouse.on_button(
             self._close_requested.set, buttons=("left", "right"), types=("down",)
+        )
+        self._esc_hook = keyboard.add_hotkey(
+            "esc", self._close_requested.set, suppress=False
         )
         self._timeout_id = self._root.after(cfg.popup_timeout_ms, self._close)
