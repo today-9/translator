@@ -15,6 +15,8 @@ DEFAULT_CONFIG = """\
 combo = "double-ctrl-c"
 # 2連打と判定する間隔 (ミリ秒)
 double_press_ms = 500
+# 手入力翻訳の小窓を開くホットキー。空文字 "" で無効化
+input_combo = "ctrl+alt+t"
 
 [engine]
 # 文章翻訳に使うエンジン: "fugumt" | "plamo" | "qwen_npu"
@@ -47,6 +49,7 @@ preload = false
 class Config:
     hotkey: str = "double-ctrl-c"
     double_press_ms: int = 500
+    input_combo: str = "ctrl+alt+t"
     sentence_engine: str = "fugumt"
     popup_timeout_ms: int = 15000
     font_family: str = "Yu Gothic UI"
@@ -69,6 +72,7 @@ def load_config() -> Config:
     hotkey = raw.get("hotkey", {})
     cfg.hotkey = hotkey.get("combo", cfg.hotkey)
     cfg.double_press_ms = hotkey.get("double_press_ms", cfg.double_press_ms)
+    cfg.input_combo = hotkey.get("input_combo", cfg.input_combo)
     engine = raw.get("engine", {})
     cfg.sentence_engine = engine.get("sentence", cfg.sentence_engine)
     popup = raw.get("popup", {})

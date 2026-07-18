@@ -12,6 +12,7 @@ from .clipboard import grab_selection, read_copied_text
 from .config import Config, load_config
 from .engines import SENTENCE_ENGINES, get_engine
 from .engines.base import EngineNotReady
+from .input_box import InputBox
 from .popup import PopupManager
 from .service import translate
 
@@ -44,6 +45,7 @@ class App:
         self.root = tk.Tk()
         self.root.withdraw()
         self.popup = PopupManager(self.root, self.cfg)
+        self.input_box = InputBox(self.root, self.cfg, self._translate_and_show)
         self.tray: pystray.Icon | None = None
 
     # ---- ホットキー処理(keyboard のスレッドから呼ばれる)----
@@ -74,10 +76,17 @@ class App:
             if not text:
                 self.popup.show("(選択テキストを取得できませんでした)", header="translator")
                 return
+            self._translate_and_show(text, locked=True)
+        finally:
+            self._busy.release()
+
+    def _translate_and_show(self, text: str, locked: bool = False) -> None:
+        """テキストを翻訳してポップアップ表示する(手入力・選択の共通経路)。"""
+        if not locked and not self._busy.acquire(blocking=False):
+            return
+        try:
             preview = text if len(text) <= 60 else text[:57] + "..."
-            engine = self.cfg.sentence_engine
-            slow = engine in ("plamo", "qwen_npu")
-            if slow:
+            if self.cfg.sentence_engine in ("plamo", "qwen_npu"):
                 self.popup.show("翻訳中...", header=preview)
             result = translate(text, self.cfg)
             self.popup.show(
@@ -90,7 +99,8 @@ class App:
         except Exception as e:
             self.popup.show(f"エラー: {e}", header="translator")
         finally:
-            self._busy.release()
+            if not locked:
+                self._busy.release()
 
     # ---- トレイメニュー ----
     def _menu(self) -> pystray.Menu:
@@ -116,6 +126,7 @@ class App:
                         else self.cfg.hotkey)
         return pystray.Menu(
             pystray.MenuItem(f"ホットキー: {hotkey_label}", None, enabled=False),
+            pystray.MenuItem("入力して翻訳...", lambda icon, item: self.input_box.ask()),
             pystray.Menu.SEPARATOR,
             *engine_items,
             pystray.Menu.SEPARATOR,
@@ -141,6 +152,9 @@ class App:
             keyboard.add_hotkey("ctrl+c", self.on_ctrl_c, suppress=False)
         else:
             keyboard.add_hotkey(self.cfg.hotkey, self.on_hotkey, suppress=False)
+        if self.cfg.input_combo:
+            keyboard.add_hotkey(self.cfg.input_combo,
+                                self.input_box.ask, suppress=False)
 
         self.tray = pystray.Icon("translator", _tray_icon_image(), "translator", self._menu())
         threading.Thread(target=self.tray.run, daemon=True).start()
