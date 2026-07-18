@@ -10,8 +10,36 @@ import tkinter as tk
 from tkinter import font as tkfont
 from typing import Callable
 
+import win32api
+import win32gui
+import win32process
+
 from .config import Config
 from .popup import BG, FG, SUB, _cursor_and_work_area
+
+
+def _force_foreground(win: tk.Toplevel) -> None:
+    """Windows のフォアグラウンド奪取防止を回避してウィンドウをアクティブ化する。
+
+    バックグラウンドプロセスは SetForegroundWindow を拒否されるため、
+    現在フォアグラウンドのスレッドに入力状態をアタッチしてから呼ぶ(定石)。
+    """
+    try:
+        hwnd = int(win.wm_frame(), 16)
+        fg = win32gui.GetForegroundWindow()
+        cur_tid = win32api.GetCurrentThreadId()
+        if fg:
+            fg_tid, _ = win32process.GetWindowThreadProcessId(fg)
+            if fg_tid != cur_tid:
+                win32process.AttachThreadInput(fg_tid, cur_tid, True)
+                try:
+                    win32gui.SetForegroundWindow(hwnd)
+                finally:
+                    win32process.AttachThreadInput(fg_tid, cur_tid, False)
+                return
+        win32gui.SetForegroundWindow(hwnd)
+    except Exception:
+        pass  # 失敗してもクリックすればフォーカスは当たる
 
 
 class InputBox:
@@ -85,4 +113,8 @@ class InputBox:
         win.bind("<Escape>", self._close)
         win.protocol("WM_DELETE_WINDOW", self._close)
         win.lift()
+        _force_foreground(win)
         entry.focus_force()
+        # 生成直後はアクティブ化が間に合わないことがあるので少し後にもう一度
+        win.after(80, lambda: (_force_foreground(win), entry.focus_set())
+                  if self._win is win else None)
