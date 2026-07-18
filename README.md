@@ -38,6 +38,16 @@ uv run translator-setup all   # 辞書+全モデルのダウンロード (合計
 
 個別に入れる場合: `translator-setup dict | fugumt | plamo | qwen`
 
+### 辞書の更新とユーザー辞書
+
+```powershell
+uv run translator-setup dict --force   # EJDict を最新版で再構築(常駐は先に終了)
+```
+
+`data/user_dict.txt` はユーザー辞書(初回セットアップ時に雛形を生成)。
+「見出し<TAB>意味」形式で書くと EJDict より優先され、保存すれば即反映される。
+古い辞書ゆえの珍訳(例: PC = Peace Corps 平和部隊)は、ここで上書きするのが早い。
+
 ## 使い方
 
 ```powershell

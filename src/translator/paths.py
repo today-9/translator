@@ -6,6 +6,7 @@ DATA_DIR = PROJECT_ROOT / "data"
 CONFIG_PATH = PROJECT_ROOT / "config.toml"
 
 DICT_DB = DATA_DIR / "ejdict.sqlite3"
+USER_DICT = DATA_DIR / "user_dict.txt"
 FUGUMT_DIR = DATA_DIR / "models" / "fugumt-en-ja-ct2"
 PLAMO_GGUF = DATA_DIR / "models" / "plamo-2-translate-Q4_K_S.gguf"
 QWEN_OV_DIR = DATA_DIR / "models" / "qwen3-4b-instruct-2507-int4-ov"

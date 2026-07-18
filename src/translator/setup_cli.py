@@ -27,10 +27,18 @@ QWEN_REPO = "Qwen/Qwen3-4B-Instruct-2507"
 LLAMA_RELEASE_API = "https://api.github.com/repos/ggml-org/llama.cpp/releases/latest"
 
 
-def setup_dict() -> None:
+def setup_dict(force: bool = False) -> None:
     if DICT_DB.exists():
-        print(f"[dict] 既に存在: {DICT_DB}")
-        return
+        if not force:
+            print(f"[dict] 既に存在: {DICT_DB} (最新版に更新するには --force)")
+            _ensure_user_dict()
+            return
+        try:
+            DICT_DB.unlink()
+        except PermissionError:
+            sys.exit("[dict] 常駐アプリが辞書を使用中です。"
+                     "トレイの「終了」で止めてから --force を実行してください")
+        print("[dict] 再構築します")
     print("[dict] EJDict-hand をダウンロード中 (a-z の26ファイル)...")
     lines: list[str] = []
     for letter in "abcdefghijklmnopqrstuvwxyz":
@@ -60,6 +68,16 @@ def setup_dict() -> None:
     conn.commit()
     conn.close()
     print(f"[dict] 完了: {n} 見出しを {DICT_DB} に構築")
+    _ensure_user_dict()
+
+
+def _ensure_user_dict() -> None:
+    from .engines.dictionary import USER_DICT_TEMPLATE
+    from .paths import USER_DICT
+
+    if not USER_DICT.exists():
+        USER_DICT.write_text(USER_DICT_TEMPLATE, encoding="utf-8")
+        print(f"[dict] ユーザー辞書の雛形を作成: {USER_DICT}")
 
 
 def setup_fugumt() -> None:
@@ -185,6 +203,8 @@ TARGETS = {
 
 def main() -> None:
     args = sys.argv[1:] or ["all"]
+    force = "--force" in args
+    args = [a for a in args if a != "--force"] or ["all"]
     if args == ["all"]:
         targets = list(TARGETS)
     elif args == ["company"]:
@@ -194,7 +214,7 @@ def main() -> None:
     for t in targets:
         if t not in TARGETS:
             sys.exit(f"不明なターゲット: {t} (候補: {', '.join(TARGETS)}, all, company)")
-        TARGETS[t]()
+        TARGETS[t](force) if t == "dict" else TARGETS[t]()
 
 
 if __name__ == "__main__":
