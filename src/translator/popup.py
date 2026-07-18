@@ -8,8 +8,22 @@ import tkinter as tk
 from tkinter import font as tkfont
 
 import mouse
+import win32api
 
 from .config import Config
+
+_MONITOR_DEFAULTTONEAREST = 2
+
+
+def _cursor_and_work_area() -> tuple[int, int, tuple[int, int, int, int]]:
+    """カーソル座標と、カーソルがいるモニターの作業領域(タスクバー除く)。"""
+    x, y = win32api.GetCursorPos()
+    try:
+        hmon = win32api.MonitorFromPoint((x, y), _MONITOR_DEFAULTTONEAREST)
+        work = win32api.GetMonitorInfo(hmon)["Work"]  # (left, top, right, bottom)
+    except Exception:
+        work = (0, 0, 1920, 1080)
+    return x, y, work
 
 BG = "#1e1f22"
 FG = "#e8e8e8"
@@ -91,14 +105,14 @@ class PopupManager:
                      anchor="e", justify="right",
                      wraplength=cfg.popup_max_width).pack(fill="x", pady=(4, 0))
 
-        # カーソル脇に配置し、画面からはみ出すならずらす
+        # カーソルがいるモニターの作業領域内に収める(マルチモニター対応。
+        # プライマリの幅でクランプするとサブモニターの訳がメインに飛ぶ)
         win.update_idletasks()
-        x, y = win.winfo_pointerxy()
+        x, y, (left, top, right, bottom) = _cursor_and_work_area()
         w, h = win.winfo_reqwidth(), win.winfo_reqheight()
-        sw, sh = win.winfo_screenwidth(), win.winfo_screenheight()
-        x = min(x + 16, sw - w - 8)
-        y = min(y + 16, sh - h - 8)
-        win.geometry(f"+{max(x, 0)}+{max(y, 0)}")
+        x = max(min(x + 16, right - w - 8), left)
+        y = max(min(y + 16, bottom - h - 8), top)
+        win.geometry(f"+{x}+{y}")
 
         win.bind("<Escape>", self._close)
         win.bind("<Button-1>", self._close)
