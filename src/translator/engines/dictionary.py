@@ -15,6 +15,7 @@ USER_DICT_TEMPLATE = """\
 # translator ユーザー辞書
 # 書式: 見出し<TAB>意味   (タブ区切り、1行1見出し。# で始まる行は無視)
 # ここの訳が先頭に表示され、EJDict の訳も続けて併記される。
+# 同じ見出しを複数行書けば全部表示される(略語の複数義など)。
 # 保存すれば即反映(アプリ再起動不要)。
 pc\t〈C〉パソコン,パーソナルコンピュータ
 """
@@ -34,12 +35,14 @@ class DictionaryEngine(Engine):
             return None
         mtime = USER_DICT.stat().st_mtime
         if mtime != self._user_mtime:
-            self._user = {}
+            entries: dict[str, list[str]] = {}
             for line in USER_DICT.read_text(encoding="utf-8").splitlines():
                 if line.startswith("#") or "\t" not in line:
                     continue
                 head, meaning = line.split("\t", 1)
-                self._user[head.strip().lower()] = meaning.strip()
+                # 同じ見出しの行は上書きせず全部並べる(略語の複数義など)
+                entries.setdefault(head.strip().lower(), []).append(meaning.strip())
+            self._user = {k: " / ".join(v) for k, v in entries.items()}
             self._user_mtime = mtime
         return self._user.get(word)
 
