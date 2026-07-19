@@ -5,27 +5,20 @@
 
 ## 1. 全体像
 
-```
-[ユーザー操作]
-  Ctrl+C ×2 ──────────┐            Ctrl+Alt+T
-  (選択テキスト)       │            (手入力)
-                      v                v
-              app.py (常駐本体)    input_box.py (入力窓)
-                      │                │
-                      └──── 共通経路 ───┘
-                             v
-                    service.translate()
-                             │   detect.py で入力を判定
-             ┌───────────────┼──────────────────┐
-             v               v                  v
-      英単語(1〜3語)      文章(英語)          日本語
-             │               │                  │
-      engines/dictionary  engines/<選択中>    お断りメッセージ
-      (ユーザー辞書+EJDict) (fugumt/plamo/qwen)
-             │               │
-             └───────┬───────┘
-                     v
-              popup.py (結果ポップアップ)
+```mermaid
+flowchart TD
+    HK["Ctrl+C ×2<br>(選択テキストを翻訳)"] --> APP["app.py(常駐本体)"]
+    IN["Ctrl+Alt+T<br>(手入力)"] --> IB["input_box.py(入力窓)"]
+    IB --> APP
+    APP --> SVC["service.translate()"]
+    SVC --> DET{"detect.py で入力を判定"}
+    DET -- "英単語(1〜3語)" --> DIC["engines/dictionary<br>ユーザー辞書 + EJDict"]
+    DET -- "英語の文章" --> ENG["engines/(選択中)<br>fugumt / plamo / qwen_npu"]
+    DET -- "日本語" --> NG["お断りメッセージ"]
+    DIC -- "見出しなし" --> ENG
+    DIC --> POP["popup.py(結果ポップアップ)"]
+    ENG --> POP
+    NG --> POP
 ```
 
 - 常駐プロセスは1つ(多重起動はミューテックスで防止)
