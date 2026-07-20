@@ -6,6 +6,7 @@ import tkinter as tk
 
 import keyboard
 import pystray
+import win32api
 from PIL import Image, ImageDraw, ImageFont
 
 from .clipboard import grab_selection, read_copied_text
@@ -15,6 +16,19 @@ from .engines.base import EngineNotReady
 from .input_box import InputBox
 from .popup import PopupManager
 from .service import translate
+
+
+# keyboard ライブラリは修飾キーの key-up を取りこぼすと「押しっぱなし」と
+# 誤認し、以後 t 単体で ctrl+alt+t が発火する。OS の実キー状態で二重確認する
+_VK = {"ctrl": 0x11, "shift": 0x10, "alt": 0x12, "windows": 0x5B}
+
+
+def _modifiers_really_down(combo: str) -> bool:
+    mods = [p.strip().lower() for p in combo.split("+")[:-1]]
+    return all(
+        bool(win32api.GetAsyncKeyState(_VK[m]) & 0x8000)
+        for m in mods if m in _VK
+    )
 
 
 def _tray_icon_image() -> Image.Image:
@@ -60,6 +74,8 @@ class App:
         """double-ctrl-c モード: 規定時間内の2回目の Ctrl+C で発火。"""
         import time as _time
 
+        if not _modifiers_really_down("ctrl+c"):
+            return  # Ctrl が実際には押されていない誤発火
         now = _time.monotonic()
         is_double = (now - self._last_ctrl_c) * 1000 <= self.cfg.double_press_ms
         self._last_ctrl_c = now
@@ -153,8 +169,11 @@ class App:
         else:
             keyboard.add_hotkey(self.cfg.hotkey, self.on_hotkey, suppress=False)
         if self.cfg.input_combo:
+            def on_input_hotkey() -> None:
+                if _modifiers_really_down(self.cfg.input_combo):
+                    self.input_box.ask()
             keyboard.add_hotkey(self.cfg.input_combo,
-                                self.input_box.ask, suppress=False)
+                                on_input_hotkey, suppress=False)
 
         self.tray = pystray.Icon("translator", _tray_icon_image(), "translator", self._menu())
         threading.Thread(target=self.tray.run, daemon=True).start()
