@@ -35,6 +35,7 @@ flowchart TD
 | `clipboard.py` | 選択テキストの取得(クリップボード退避・復元含む) |
 | `popup.py` | 結果ポップアップ(位置決め・Esc/クリック消去) |
 | `input_box.py` | 手入力翻訳の小窓(フォアグラウンド奪取対応) |
+| `hotkeys.py` | RegisterHotKey バックエンド(none モード。フックを張らない) |
 | `config.py` | config.toml の読み込みとデフォルト値 |
 | `paths.py` | 全ファイルパスの定義(モデル・辞書・設定) |
 | `engines/base.py` | エンジンの抽象基底(`Engine`)と `EngineNotReady` |
@@ -54,8 +55,9 @@ flowchart TD
 
 | セクション | キー | 既定値 | 意味 |
 |---|---|---|---|
+| hotkey | mode | "global" | "global"=フック(2連打可・EDR検知有) / "none"=RegisterHotKey(フックなし・EDR安全)。→ §8 |
 | hotkey | combo | "double-ctrl-c" | 選択翻訳のトリガー。keyboard書式("f9"等)にも変更可 |
-| hotkey | double_press_ms | 500 | 2連打の判定間隔 |
+| hotkey | double_press_ms | 500 | 2連打の判定間隔(global のみ) |
 | hotkey | input_combo | "ctrl+alt+t" | 入力窓のホットキー。"" で無効化 |
 | engine | sentence | "fugumt" | 文章エンジン: fugumt / plamo / qwen_npu |
 | popup | timeout_ms | 300000 | 自動クローズまでの時間(Esc/クリック消去の保険) |
@@ -172,3 +174,37 @@ data/
 | `uv run translator-setup [dict/fugumt/llama/plamo/qwen/all/company] [--force]` | セットアップ |
 | `uv run translator-cli [-e エンジン] "text"` | ワンショット翻訳 |
 | `uv run translator-bench [--engines ...] [--runs N]` | ベンチマーク |
+
+## 8. ホットキー方式(global / none)と EDR
+
+キー入力の待ち受けには2方式あり、`config.toml` の `[hotkey] mode` で切り替える。
+
+### global モード(既定・個人PC向け)
+
+`keyboard` / `mouse` ライブラリの**低レベルフック**(`SetWindowsHookEx`)で
+全キー・マウス入力を傍受する。これにより実現できること:
+
+- `Ctrl+C` 2連打の検知(単一キーの連打はフックでしか取れない)
+- ポップアップ表示中だけ Esc/クリックを**グローバルに**拾って閉じる
+
+**欠点: 全入力の傍受はキーロガーと同じ挙動**なので、CrowdStrike 等の EDR に
+検知される。未署名プロセスだと確実に引っかかる。
+
+### none モード(会社PC向け)
+
+フックを一切張らない。`hotkeys.py` の `RegisterHotKey`(OS がキー組み合わせを
+予約する公認 API。他アプリの入力は覗かない)で待ち受ける。
+
+- `keyboard` / `mouse` は **import すらしない**(遅延 import。§2 のフック系コードを
+  一切ロードしない)
+- 選択翻訳は「コピー後にホットキー」= クリップボードの内容を訳す動作。
+  2連打は原理的に不可なので combo は通常の組み合わせ(既定 `ctrl+alt+c`)。
+  `"double-ctrl-c"` 指定時は `ctrl+alt+c` に自動置換
+- 入力窓はホットキー(`ctrl+alt+t`)に加え**トレイ左クリック**でも開く
+- ポップアップは overrideredirect ではなく toolwindow 枠(フォーカスを持てる)にし、
+  Esc / FocusOut(他所クリック)/ タイムアウトで閉じる
+- `translator-setup company` は none モードの config.toml を生成する
+
+EDR 検知の回避を目的とした難読化・フック隠蔽は**やってはいけない**
+(良性ツールがマルウェア扱いに格上げされる)。none モードは「検知される挙動を
+そもそもしない」正攻法。それでも組織のポリシー次第なので、導入は情シス確認の上で。

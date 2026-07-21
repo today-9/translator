@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import time
 
-import keyboard
 import win32clipboard
 import win32con
 
@@ -51,7 +50,10 @@ def read_copied_text() -> str | None:
 
 
 def grab_selection(hotkey_combo: str) -> str | None:
-    """選択中テキストを返す。取得できなければ None。"""
+    """選択中テキストを返す。取得できなければ None。global モード専用
+    (keyboard ライブラリで Ctrl+C を送出する)。"""
+    import keyboard  # global モードでのみロード(none モードはフックを一切張らない)
+
     saved = _read_clipboard_text()
 
     # ホットキーの修飾キーが押されたままだと Ctrl+C が化けるので先に離す

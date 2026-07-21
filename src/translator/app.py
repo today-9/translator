@@ -4,7 +4,6 @@ from __future__ import annotations
 import threading
 import tkinter as tk
 
-import keyboard
 import pystray
 import win32api
 from PIL import Image, ImageDraw, ImageFont
@@ -16,6 +15,9 @@ from .engines.base import EngineNotReady
 from .input_box import InputBox
 from .popup import PopupManager
 from .service import translate
+
+# none モードで "double-ctrl-c" が指定されていたときの代替(2連打はフックなしでは不可)
+_NONE_MODE_DEFAULT_COMBO = "ctrl+alt+c"
 
 
 # keyboard ライブラリは修飾キーの key-up を取りこぼすと「押しっぱなし」と
@@ -61,6 +63,7 @@ class App:
         self.popup = PopupManager(self.root, self.cfg)
         self.input_box = InputBox(self.root, self.cfg, self._translate_and_show)
         self.tray: pystray.Icon | None = None
+        self._listener = None  # none モードの RegisterHotKey リスナー
 
     # ---- ホットキー処理(keyboard のスレッドから呼ばれる)----
     def on_hotkey(self) -> None:
@@ -82,6 +85,22 @@ class App:
         if is_double:
             self._last_ctrl_c = 0.0  # 3連打で2回発火しないようリセット
             self.on_hotkey()
+
+    def on_clipboard_hotkey(self) -> None:
+        """none モード: 現在のクリップボード内容を翻訳する(コピー後にホットキー)。"""
+        if self.paused:
+            return
+        if not self._busy.acquire(blocking=False):
+            return
+        try:
+            text = read_copied_text()
+            if not text:
+                self.popup.show("(クリップボードが空です。コピーしてからどうぞ)",
+                                header="translator")
+                return
+            self._translate_and_show(text, locked=True)
+        finally:
+            self._busy.release()
 
     def _capture_and_translate(self) -> None:
         try:
@@ -138,11 +157,16 @@ class App:
                 set_engine(n), checked=is_engine(n), radio=True)
             for n in self.available_engines
         ]
-        hotkey_label = ("Ctrl+C ×2" if self.cfg.hotkey == "double-ctrl-c"
-                        else self.cfg.hotkey)
+        if self.cfg.hook_mode == "none":
+            hotkey_label = self._selection_combo()
+        else:
+            hotkey_label = ("Ctrl+C ×2" if self.cfg.hotkey == "double-ctrl-c"
+                            else self.cfg.hotkey)
         return pystray.Menu(
             pystray.MenuItem(f"ホットキー: {hotkey_label}", None, enabled=False),
-            pystray.MenuItem("入力して翻訳...", lambda icon, item: self.input_box.ask()),
+            # 既定アクション(トレイ左クリック)= 入力窓。none モードでフックなしでも開ける
+            pystray.MenuItem("入力して翻訳...",
+                             lambda icon, item: self.input_box.ask(), default=True),
             pystray.Menu.SEPARATOR,
             *engine_items,
             pystray.Menu.SEPARATOR,
@@ -159,11 +183,21 @@ class App:
             pass
         if self.tray is not None:
             self.tray.stop()
-        keyboard.unhook_all()
+        if self._listener is not None:
+            self._listener.stop()
+        else:
+            import keyboard
+            keyboard.unhook_all()
         self.root.after(0, self.root.destroy)
 
-    # ---- 起動 ----
-    def run(self) -> None:
+    def _selection_combo(self) -> str:
+        """none モードの選択翻訳ホットキー。2連打指定なら組み合わせに置換。"""
+        if self.cfg.hotkey in ("double-ctrl-c", ""):
+            return _NONE_MODE_DEFAULT_COMBO
+        return self.cfg.hotkey
+
+    def _register_hotkeys_global(self) -> None:
+        import keyboard  # 低レベルフックをここでロード(EDR に検知され得る)
         if self.cfg.hotkey == "double-ctrl-c":
             keyboard.add_hotkey("ctrl+c", self.on_ctrl_c, suppress=False)
         else:
@@ -174,6 +208,31 @@ class App:
                     self.input_box.ask()
             keyboard.add_hotkey(self.cfg.input_combo,
                                 on_input_hotkey, suppress=False)
+
+    def _register_hotkeys_nohook(self) -> None:
+        from .hotkeys import HotkeyError, HotkeyListener
+
+        listener = HotkeyListener()
+        try:
+            listener.add(self._selection_combo(), self.on_clipboard_hotkey)
+            if self.cfg.input_combo:
+                listener.add(self.cfg.input_combo, self.input_box.ask)
+        except HotkeyError as e:
+            self.popup.show(f"ホットキー設定エラー: {e}", header="translator")
+        failures = listener.start()
+        self._listener = listener
+        if failures:
+            self.popup.show(
+                "次のホットキーは他アプリが使用中で登録できませんでした:\n"
+                + ", ".join(failures) + "\nトレイの左クリックからも翻訳できます",
+                header="translator")
+
+    # ---- 起動 ----
+    def run(self) -> None:
+        if self.cfg.hook_mode == "none":
+            self._register_hotkeys_nohook()
+        else:
+            self._register_hotkeys_global()
 
         self.tray = pystray.Icon("translator", _tray_icon_image(), "translator", self._menu())
         threading.Thread(target=self.tray.run, daemon=True).start()
@@ -191,9 +250,13 @@ class App:
                 pass
         threading.Thread(target=preload, daemon=True).start()
 
-        hint = ("テキストを選択して Ctrl+C を2連打で翻訳します"
-                if self.cfg.hotkey == "double-ctrl-c"
-                else f"テキストを選択して {self.cfg.hotkey} で翻訳します")
+        if self.cfg.hook_mode == "none":
+            hint = (f"コピー後 {self._selection_combo()} で翻訳 / "
+                    f"{self.cfg.input_combo or 'トレイ左クリック'} で入力窓")
+        elif self.cfg.hotkey == "double-ctrl-c":
+            hint = "テキストを選択して Ctrl+C を2連打で翻訳します"
+        else:
+            hint = f"テキストを選択して {self.cfg.hotkey} で翻訳します"
         self.popup.show(f"起動しました。{hint}", header="translator")
         try:
             self.root.mainloop()

@@ -10,10 +10,17 @@ DEFAULT_CONFIG = """\
 # translator 設定ファイル
 
 [hotkey]
-# "double-ctrl-c" = Ctrl+C 2連打で翻訳(推奨。他アプリと衝突しない)
-# または keyboard ライブラリの書式で組み合わせ指定。例: "ctrl+alt+t", "f9"
+# ホットキーの方式:
+#   "global" = keyboard ライブラリの低レベルフック。Ctrl+C 2連打が使える反面、
+#              全キー入力を傍受するため EDR(CrowdStrike 等)にキーロガー検知される
+#   "none"   = RegisterHotKey(OS公認)。フックを一切張らないので EDR に安全。
+#              ただし 2連打は使えず、combo は通常の組み合わせ(例 "ctrl+alt+c")、
+#              選択翻訳は「コピー後にホットキー」= クリップボードの内容を訳す動作になる
+mode = "global"
+# global モード: "double-ctrl-c"(2連打)または組み合わせ("f9" 等)
+# none モード:   組み合わせのみ(例 "ctrl+alt+c")。"double-ctrl-c" 指定時は自動置換
 combo = "double-ctrl-c"
-# 2連打と判定する間隔 (ミリ秒)
+# 2連打と判定する間隔 (ミリ秒。global モードのみ)
 double_press_ms = 500
 # 手入力翻訳の小窓を開くホットキー。空文字 "" で無効化
 input_combo = "ctrl+alt+t"
@@ -48,6 +55,7 @@ preload = false
 
 @dataclass
 class Config:
+    hook_mode: str = "global"  # "global" | "none"
     hotkey: str = "double-ctrl-c"
     double_press_ms: int = 500
     input_combo: str = "ctrl+alt+t"
@@ -71,6 +79,7 @@ def load_config() -> Config:
     raw = tomllib.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     cfg = Config()
     hotkey = raw.get("hotkey", {})
+    cfg.hook_mode = hotkey.get("mode", cfg.hook_mode)
     cfg.hotkey = hotkey.get("combo", cfg.hotkey)
     cfg.double_press_ms = hotkey.get("double_press_ms", cfg.double_press_ms)
     cfg.input_combo = hotkey.get("input_combo", cfg.input_combo)

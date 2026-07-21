@@ -201,16 +201,40 @@ TARGETS = {
 }
 
 
+def _apply_company_config() -> None:
+    """会社PC向けに hook_mode を none にした config を用意する。
+    既存 config は上書きしない(既にある場合は注意喚起のみ)。"""
+    from .config import DEFAULT_CONFIG
+    from .paths import CONFIG_PATH
+
+    if CONFIG_PATH.exists():
+        text = CONFIG_PATH.read_text(encoding="utf-8")
+        if 'mode = "none"' not in text:
+            print('[company] 注意: 既存の config.toml があります。'
+                  '[hotkey] の mode を "none" に変更してください'
+                  '(フックなし=EDRに検知されないモード)')
+        return
+    CONFIG_PATH.write_text(
+        DEFAULT_CONFIG.replace('mode = "global"', 'mode = "none"'),
+        encoding="utf-8",
+    )
+    print('[company] config.toml を hook_mode="none"(フックなし)で生成しました')
+
+
 def main() -> None:
     args = sys.argv[1:] or ["all"]
     force = "--force" in args
     args = [a for a in args if a != "--force"] or ["all"]
+    company = False
     if args == ["all"]:
         targets = list(TARGETS)
     elif args == ["company"]:
         targets = ["dict", "fugumt", "qwen"]  # PLaMo抜き(全コンポーネント商用可)
+        company = True
     else:
         targets = args
+    if company:
+        _apply_company_config()
     for t in targets:
         if t not in TARGETS:
             sys.exit(f"不明なターゲット: {t} (候補: {', '.join(TARGETS)}, all, company)")

@@ -7,8 +7,6 @@ import threading
 import tkinter as tk
 from tkinter import font as tkfont
 
-import keyboard
-import mouse
 import win32api
 
 from .config import Config
@@ -64,12 +62,14 @@ class PopupManager:
 
     def _unhook_mouse(self) -> None:
         if self._mouse_hook is not None:
+            import mouse
             try:
                 mouse.unhook(self._mouse_hook)
             except (ValueError, OSError):
                 pass
             self._mouse_hook = None
         if self._esc_hook is not None:
+            import keyboard
             try:
                 keyboard.remove_hotkey(self._esc_hook)
             except (KeyError, ValueError):
@@ -89,9 +89,17 @@ class PopupManager:
         self._close()
         self._close_requested.clear()  # 直前のクリック残留で即閉じないように
         cfg = self._cfg
+        no_hook = cfg.hook_mode == "none"
         win = tk.Toplevel(self._root)
         self._win = win
-        win.overrideredirect(True)
+        if no_hook:
+            # フックを使わず Esc/クリックで閉じるにはフォーカスを持てる窓が必要。
+            # overrideredirect の枠なし窓は Windows でフォーカスを取れないため、
+            # 細いツールウィンドウ枠にする
+            win.title("訳")
+            win.attributes("-toolwindow", True)
+        else:
+            win.overrideredirect(True)
         win.attributes("-topmost", True)
 
         frame = tk.Frame(win, bg=BG, padx=12, pady=10,
@@ -124,14 +132,22 @@ class PopupManager:
 
         win.bind("<Escape>", self._close)
         win.bind("<Button-1>", self._close)
-        # 画面のどこをクリックしても・Esc でも閉じる(タイムアウトは保険)。
-        # ポップアップはフォーカスを奪わない設計のため、表示中だけ
-        # グローバルフックで受ける。suppress しないので前面アプリの
-        # Esc 動作はそのまま
-        self._mouse_hook = mouse.on_button(
-            self._close_requested.set, buttons=("left", "right"), types=("down",)
-        )
-        self._esc_hook = keyboard.add_hotkey(
-            "esc", self._close_requested.set, suppress=False
-        )
+        if no_hook:
+            # フックなし: 窓自身にフォーカスを当て、Esc(窓バインド)と
+            # FocusOut(他所をクリック)で閉じる。グローバル監視はしない
+            win.bind("<FocusOut>", self._close)
+            win.focus_force()
+        else:
+            # 画面のどこをクリックしても・Esc でも閉じる(タイムアウトは保険)。
+            # ポップアップはフォーカスを奪わない設計のため、表示中だけ
+            # グローバルフックで受ける。suppress しないので前面アプリの
+            # Esc 動作はそのまま
+            import keyboard
+            import mouse
+            self._mouse_hook = mouse.on_button(
+                self._close_requested.set, buttons=("left", "right"), types=("down",)
+            )
+            self._esc_hook = keyboard.add_hotkey(
+                "esc", self._close_requested.set, suppress=False
+            )
         self._timeout_id = self._root.after(cfg.popup_timeout_ms, self._close)
